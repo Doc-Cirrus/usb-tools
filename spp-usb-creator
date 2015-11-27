@@ -1,0 +1,176 @@
+#!/bin/bash
+
+# 8GB usb min size limit
+deviceSizeLimit=$(expr 8 \* 1024 \* 1024 \* 1024)
+mbrBinLocations="/usr/share/syslinux/mbr.bin /usr/lib/syslinux/mbr.bin"
+tmpParent="/tmp"
+isoMnt="$tmpParent/spp-usb-creator-iso"
+deviceMnt="$tmpParent/spp-usb-creator-device"
+
+# required cmd line tools
+requiredTools="readlink basename parted syslinux"
+
+function help {
+  echo
+  echo "Usage: $scriptName --iso <pathToIso> --device </dev/sdX>"
+  echo
+  echo "Creates bootable USB stick from HP SPP ISO."
+  echo "  --iso    Uses provided ISO file"
+  echo "  --device Use the specified unmounted device as target"
+  echo
+  exit 0
+}
+
+
+# process options
+while [[ $# -ge 1 ]]; do
+  key="$1"
+  shift
+  case "$key" in
+    --device)
+      device="$1"
+      shift
+      ;;
+    --iso)
+      iso="$1"
+      shift
+      ;;
+    *)
+      # unknown
+    ;;
+  esac
+done
+
+function _error {
+  echo "$@"
+  exit 1
+}
+
+if [ -z "$iso" ]; then
+  _error "Missing path to .iso file."
+fi
+
+if [ -z "$device" -o ! -b "$device" ]; then
+  _error "Missing device."
+fi
+
+deviceName=$(basename "$device")
+
+script=$(readlink -f "$0")
+scriptPath=$(dirname "$script")
+scriptName=$(basename "$script")
+
+function _log {
+  echo "$@"
+}
+
+function cleanup {
+  _log "Cleanup resources..."
+  sync
+  if mountpoint "$isoMnt" &>/dev/null; then
+    umount -df "$isoMnt" &>/dev/null
+  fi
+  # needs some time before can be removed after umount
+  sleep 1
+  if [ -d "$isoMnt" ]; then
+    rm -rf "$isoMnt"
+  fi
+  if mountpoint "$deviceMnt" &>/dev/null; then
+    umount -f "$deviceMnt" &>/dev/null
+  fi
+  sleep 1
+  if [ -d "$deviceMnt" ]; then
+    rm -rf "$deviceMnt"
+  fi
+}
+
+_exec() {
+  local cmd="$@"
+  _log "Exec: ´$cmd´"
+  # todo create confirm for every operation
+  # todo maybe more trustworthy for admins :)
+  result=$(${cmd} 2>&1)
+  resultCode="$?"
+  if [ "$resultCode" -ne 0 ]; then
+    cleanup
+    _error "Exec failed: ´$result´"
+  fi
+}
+
+mbrBin=""
+function checkMbrBinLocations {
+  for mbrBinLocation in ${mbrBinLocations}; do
+    if [ -f ${mbrBinLocation} ]; then
+      mbrBin="${mbrBinLocation}"
+      break
+    fi
+  done
+  if [ ! -f "$mbrBin" ]; then
+    _error "No mbr.bin found in one of the locations ´$mbrBinLocations´"
+  fi
+}
+
+function checkTools {
+  for tool in ${requiredTools}; do
+    if ! which ${tool} &>/dev/null; then
+      _error "Please install software package what provides: $tool"
+    fi
+  done
+}
+
+function checkDevice {
+  _log "Check device $device"
+  local deviceSize=$(expr 512 \* $(cat /sys/block/${deviceName}/size))
+  if [ "${deviceSize}" -lt "${deviceSizeLimit}" ]; then
+    _error "Device is too small. Current: ${deviceSize} Expected min: ${deviceSizeLimit}"
+  fi
+}
+
+function prepareISO {
+  _log "Check & mount $iso to $isoMnt"
+  _exec "mkdir -p ${isoMnt}"
+  _exec "mount -t iso9660 -o loop $iso $isoMnt"
+  if [ ! -d "$isoMnt/system" -o ! -d "$isoMnt/system" ]; then
+    cleanup
+    _error "Missing system/ or usb/ directory at SPP directory structure. Maybe wrong iso file?"
+  fi
+}
+
+function prepareDevice {
+  _log "Prepare device... $device"
+  echo -n "All data on ´$device´ will be deleted, proceed? [y/N] "
+  read -n 1 confirm
+  if [ "$confirm" != "y" ]; then
+    _log ""
+    cleanup
+    _error ""
+  fi
+  _log ""
+  _log "Create fat32 partition..."
+  _exec "echo -e \"o\nn\np\n1\n\n\nw\" | fdisk ${device}"
+  _exec "mkfs.vfat ${device}1"
+  _exec "mkdir -p ${deviceMnt}"
+  _exec "mount ${device}1 ${deviceMnt}"
+}
+
+function buildDevice {
+  _log "Copy data to device... takes some time."
+  _exec "cp -R ${isoMnt}/* ${deviceMnt}"
+  _log "Install syslinux on device..."
+  _exec "syslinux -i ${device}1"
+  _exec "dd conv=notrunc bs=440 count=1 if=$mbrBin of=${device}"
+  _exec "parted ${device} set 1 boot on"
+  _exec "rm -rf ${deviceMnt}/${syslinux}*"
+  _exec "cp ${isoMnt}/system/* ${isoMnt}/usb/syslinux.cfg ${deviceMnt}/"
+  # Remove line DEFAULT vesamenu.c32
+  # vesamenu often fails
+  _exec "sed -i 's/^DEFAULT.*//' ${deviceMnt}/syslinux.cfg"
+}
+
+checkTools
+checkMbrBinLocations
+checkDevice
+prepareISO
+prepareDevice
+buildDevice
+cleanup
