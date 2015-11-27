@@ -11,9 +11,8 @@ It stops shortly with "boot: " prompt, but if no input is done, it continues sho
 The firmwares (including ILO) are updated automatically. At the end the server is shut down.
 
 ## Requirements
-- HP Service Pack for ProLiant ISO file
-  Current is here: ftp://ftp.hp.com/pub/softlib2/software1/cd-generic/p67859018/v113584/SPP2015100.2015_0921.6.iso
-  ~5.5GB - will not fit onto common DVD
-- USB stick with 8+GB size
+- HP Service Pack for ProLiant ISO file (~5.5GB)
+- Current one: ftp://ftp.hp.com/pub/softlib2/software1/cd-generic/p67859018/v113584/SPP2015100.2015_0921.6.iso
+- USB stick with min 8GB size
 - Linux
 
