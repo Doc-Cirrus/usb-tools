@@ -18,7 +18,7 @@ function help {
   echo "  --iso    Uses provided ISO file"
   echo "  --device Use the specified unmounted device as target"
   echo
-  exit 0
+  exit 1
 }
 
 
@@ -35,6 +35,9 @@ while [[ $# -ge 1 ]]; do
       iso="$1"
       shift
       ;;
+    --help)
+      help
+      ;;
     *)
       # unknown
     ;;
@@ -45,6 +48,10 @@ function _error {
   echo "$@"
   exit 1
 }
+
+if [ -z "$iso" -a -z "$device" ]; then
+  help
+fi
 
 if [ -z "$iso" ]; then
   _error "Missing path to .iso file."
