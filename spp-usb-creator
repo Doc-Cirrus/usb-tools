@@ -167,7 +167,6 @@ function buildDevice {
   _exec "syslinux -i ${device}1"
   _exec "dd conv=notrunc bs=440 count=1 if=$mbrBin of=${device}"
   _exec "parted ${device} set 1 boot on"
-  _exec "rm -rf ${deviceMnt}/${syslinux}*"
   _exec "cp ${isoMnt}/system/* ${isoMnt}/usb/syslinux.cfg ${deviceMnt}/"
   # Remove line DEFAULT vesamenu.c32
   # vesamenu often fails
