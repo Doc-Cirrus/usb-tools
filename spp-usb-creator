@@ -91,12 +91,12 @@ function cleanup {
   fi
 }
 
-_exec() {
+function _exec {
   local cmd="$@"
   _log "Exec: ´$cmd´"
   # todo create confirm for every operation
   # todo maybe more trustworthy for admins :)
-  result=$(${cmd} 2>&1)
+  result=$(bash -c "$cmd" 2>&1)
   resultCode="$?"
   if [ "$resultCode" -ne 0 ]; then
     cleanup
@@ -154,7 +154,7 @@ function prepareDevice {
   fi
   _log ""
   _log "Create fat32 partition..."
-  _exec "echo -e \"o\nn\np\n1\n\n\nw\" | fdisk ${device}"
+  _exec "echo -e 'o\nn\np\n1\n\n+7G\nw' | fdisk ${device}"
   _exec "mkfs.vfat ${device}1"
   _exec "mkdir -p ${deviceMnt}"
   _exec "mount ${device}1 ${deviceMnt}"
@@ -171,7 +171,7 @@ function buildDevice {
   _exec "cp ${isoMnt}/system/* ${isoMnt}/usb/syslinux.cfg ${deviceMnt}/"
   # Remove line DEFAULT vesamenu.c32
   # vesamenu often fails
-  _exec "sed -i 's/^DEFAULT.*//' ${deviceMnt}/syslinux.cfg"
+  _exec "sed -i \"s/^DEFAULT.*//\" ${deviceMnt}/syslinux.cfg"
 }
 
 checkTools
