@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 8GB usb min size limit
-deviceSizeLimit=$(expr 8 \* 1024 \* 1024 \* 1024)
+deviceSizeLimit=$((8 * 1024 * 1024 * 1024))
 mbrBinLocations="/usr/share/syslinux/mbr.bin /usr/lib/syslinux/mbr.bin"
 tmpParent="/tmp"
 isoMnt="$tmpParent/spp-usb-creator-iso"
@@ -49,7 +49,7 @@ function _error {
   exit 1
 }
 
-if [ -z "$iso" -a -z "$device" ]; then
+if [[ -z "$iso" ]] && [[ -z "$device" ]]; then
   help
 fi
 
@@ -57,7 +57,7 @@ if [ -z "$iso" ]; then
   _error "Missing path to .iso file."
 fi
 
-if [ -z "$device" -o ! -b "$device" ]; then
+if [[ -z "$device" ]] || [[ ! -b "$device" ]]; then
   _error "Missing device."
 fi
 
@@ -92,7 +92,7 @@ function cleanup {
 }
 
 function _exec {
-  local cmd="$@"
+  local cmd="$*"
   _log "Exec: ´$cmd´"
   # todo create confirm for every operation
   # todo maybe more trustworthy for admins :)
@@ -107,7 +107,7 @@ function _exec {
 mbrBin=""
 function checkMbrBinLocations {
   for mbrBinLocation in ${mbrBinLocations}; do
-    if [ -f ${mbrBinLocation} ]; then
+    if [ -f "${mbrBinLocation}" ]; then
       mbrBin="${mbrBinLocation}"
       break
     fi
@@ -119,7 +119,7 @@ function checkMbrBinLocations {
 
 function checkTools {
   for tool in ${requiredTools}; do
-    if ! which ${tool} &>/dev/null; then
+    if ! which "${tool}" &>/dev/null; then
       _error "Please install software package what provides: $tool"
     fi
   done
@@ -127,7 +127,8 @@ function checkTools {
 
 function checkDevice {
   _log "Check device $device"
-  local deviceSize=$(expr 512 \* $(cat /sys/block/${deviceName}/size))
+  local deviceSize
+  deviceSize=$((512 * $(cat "/sys/block/${deviceName}/size")))
   if [ "${deviceSize}" -lt "${deviceSizeLimit}" ]; then
     _error "Device is too small. Current: ${deviceSize} Expected min: ${deviceSizeLimit}"
   fi
@@ -137,7 +138,7 @@ function prepareISO {
   _log "Check & mount $iso to $isoMnt"
   _exec "mkdir -p ${isoMnt}"
   _exec "mount -t iso9660 -o loop $iso $isoMnt"
-  if [ ! -d "$isoMnt/system" -o ! -d "$isoMnt/system" ]; then
+  if [[ ! -d "$isoMnt/system" ]] || [[ ! -d "$isoMnt/system" ]]; then
     cleanup
     _error "Missing system/ or usb/ directory at SPP directory structure. Maybe wrong iso file?"
   fi
@@ -146,7 +147,7 @@ function prepareISO {
 function prepareDevice {
   _log "Prepare device... $device"
   echo -n "All data on ´$device´ will be deleted, proceed? [y/N] "
-  read -n 1 confirm
+  read -rn 1 confirm
   if [ "$confirm" != "y" ]; then
     _log ""
     cleanup
