@@ -1,0 +1,161 @@
+#!/bin/bash
+
+#######################################
+# Writes text to stderr
+# Arguments:
+#   Log text
+# Returns:
+#   None
+#######################################
+_log() {
+  >&2 echo "$*"
+}
+
+#######################################
+# Writes error to stderr
+# Will exit with code 1 or optional error code != 0
+# Arguments:
+#   Error text
+#   Optional error code
+# Returns:
+#   None
+#######################################
+_error() {
+  >&2 echo "$1"
+}
+
+#######################################
+# Executes given command line
+# Arguments:
+#   Command line
+# Returns:
+#   Return code of execution
+#######################################
+_exec() {
+  local cmd="$*"
+  _log "Exec: ´$cmd´"
+  result=$(bash -c "$cmd" 2>&1)
+  resultCode="$?"
+  if [ "$resultCode" -ne 0 ]; then
+    _error "Exec failed: ´$result´"
+  fi
+  return ${resultCode}
+}
+
+#######################################
+# Umount tmp mount points quietly and remove mountpoint
+# Globals:
+#   None
+# Arguments:
+#   tmp mount point
+# Returns:
+#   None
+#######################################
+_umount() {
+  local mnt="$*"
+  sync
+  if [[ -n "$mnt" ]]; then
+    if mountpoint "$mnt" &>/dev/null; then
+      umount -df "$mnt" &>/dev/null
+    fi
+  fi
+  # needs some time before can be removed after umount
+  sleep 1
+  if [ -d "$mnt" ]; then
+    rm -rf "$mnt"
+  fi
+}
+
+#######################################
+# Checks availability of cmd line tools
+# Arguments:
+#   List of cmd line tools
+# Returns:
+#   None
+#######################################
+_check_tools() {
+  for tool in "${@}"; do
+    if ! which "${tool}" &>/dev/null; then
+      _error "Please install software package what provides: $tool"
+      return 1
+    fi
+  done
+}
+
+#######################################
+# Try to find mbr.bin from syslinux package
+# Arguments:
+#   None
+# Returns:
+#   Path to mbr.bin
+#######################################
+_get_mbr_bin_path() {
+  local possible_locations="/usr/share/syslinux/mbr.bin /usr/lib/syslinux/mbr.bin"
+  mbr_bin=""
+  for mbrBinLocation in ${possible_locations}; do
+    if [ -f "${mbrBinLocation}" ]; then
+      mbr_bin="${mbrBinLocation}"
+      break
+    fi
+  done
+  if [ -z "$mbr_bin" ]; then
+    _error "No mbr.bin found in one of the locations ´$possible_locations´"
+    return 1
+  else
+    echo "$mbr_bin"
+  fi
+}
+
+#######################################
+# Mounts given iso file to /mnt/<isofilename>
+# Arguments:
+#   Path to ISO file
+# Returns:
+#   Path to mount
+#######################################
+_mount_iso() {
+  local iso="$1"
+  if [ ! -f "$iso" ]; then
+    _error "File not found ´$iso´."
+    return 1
+  fi
+  local mnt
+  mnt="$(_mnt_point "$iso")"
+  if ! _exec "mkdir -p \"${mnt}\" && mount -t iso9660 -o loop \"$iso\" \"${mnt}\""; then
+    return 1
+  fi
+  echo "$mnt"
+}
+
+#######################################
+#
+# Arguments:
+#   device or file
+# Returns:
+#   mount point
+#######################################
+_mnt_point() {
+  local file="$1"
+  echo "/mnt/$(basename "$file")"
+}
+
+#######################################
+# Mounts given device to /mnt/<device name>
+# Arguments:
+#   Path to device e.g. /dev/sda1
+# Returns:
+#   Path to mount
+#######################################
+_mount_device() {
+  local device="$1"
+  if [ ! -b "$device" ]; then
+    _error "Device not found ´$device´."
+    return 1
+  fi
+  local mnt
+  mnt="$(_mnt_point "$device")"
+  if ! _exec "mkdir -p \"${mnt}\" && mount \"$device\" \"${mnt}\""; then
+    return 1
+  fi
+  echo "$mnt"
+}

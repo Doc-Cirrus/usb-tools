@@ -1,18 +1,24 @@
 #!/bin/bash
+#
+# Creation of USB stick for HP SPP
+
+script=$(readlink -f "$0")
+script_path=$(dirname "$script")
+script_name=$(basename "$script")
+
+# shellcheck source=/dev/null
+if ! source "$script_path/_functions"; then
+  echo "Function inclusion failed."
+  exit 1
+fi
 
 # 8GB usb min size limit
-deviceSizeLimit=$((8 * 1024 * 1024 * 1024))
-mbrBinLocations="/usr/share/syslinux/mbr.bin /usr/lib/syslinux/mbr.bin"
-tmpParent="/tmp"
-isoMnt="$tmpParent/spp-usb-creator-iso"
-deviceMnt="$tmpParent/spp-usb-creator-device"
-
-# required cmd line tools
-requiredTools="readlink basename parted syslinux"
+# todo determine min usb size based on iso size
+device_size_limit=$((8 * 1024 * 1024 * 1024))
 
 function help {
   echo
-  echo "Usage: $scriptName --iso <pathToIso> --device </dev/sdX>"
+  echo "Usage: $script_name --iso <pathToIso> --device </dev/sdX>"
   echo
   echo "Creates bootable USB stick from HP SPP ISO."
   echo "  --iso    Uses provided ISO file"
@@ -20,7 +26,6 @@ function help {
   echo
   exit 1
 }
-
 
 # process options
 while [[ $# -ge 1 ]]; do
@@ -44,140 +49,102 @@ while [[ $# -ge 1 ]]; do
   esac
 done
 
-function _error {
-  echo "$@"
-  exit 1
-}
-
-if [[ -z "$iso" ]] && [[ -z "$device" ]]; then
+if [ -z "$iso" ]; then
+  _error "Missing path to .iso file."
   help
 fi
 
-if [ -z "$iso" ]; then
-  _error "Missing path to .iso file."
-fi
-
-if [[ -z "$device" ]] || [[ ! -b "$device" ]]; then
+if [[ -z "$device" ]]; then
   _error "Missing device."
+  help
 fi
 
-deviceName=$(basename "$device")
+# required cmd line tools
+_check_tools "readlink basename syslinux"
+if ! mbr_bin_path=$(_get_mbr_bin_path); then
+  exit 1
+fi
 
-script=$(readlink -f "$0")
-scriptPath=$(dirname "$script")
-scriptName=$(basename "$script")
+echo -n "All data on ´$device´ will be deleted, proceed? [y/N] "
+read -rn 1 confirm
+echo ""
+if [ "$confirm" != "y" ]; then
+  echo ""
+  exit 1
+fi
 
-function _log {
-  echo "$@"
+cleanup() {
+  _umount "$(_mnt_point "${device}1")"
+  _umount "$(_mnt_point "${iso}")"
 }
 
-function cleanup {
-  _log "Cleanup resources..."
-  sync
-  if mountpoint "$isoMnt" &>/dev/null; then
-    umount -df "$isoMnt" &>/dev/null
-  fi
-  # needs some time before can be removed after umount
-  sleep 1
-  if [ -d "$isoMnt" ]; then
-    rm -rf "$isoMnt"
-  fi
-  if mountpoint "$deviceMnt" &>/dev/null; then
-    umount -f "$deviceMnt" &>/dev/null
-  fi
-  sleep 1
-  if [ -d "$deviceMnt" ]; then
-    rm -rf "$deviceMnt"
+execute() {
+  if ! _exec "$*"; then
+    handle_code 1
   fi
 }
 
-function _exec {
-  local cmd="$*"
-  _log "Exec: ´$cmd´"
-  # todo create confirm for every operation
-  # todo maybe more trustworthy for admins :)
-  result=$(bash -c "$cmd" 2>&1)
-  resultCode="$?"
-  if [ "$resultCode" -ne 0 ]; then
+handle_code() {
+  local code="$1"
+  if [ "$code" -ne 0 ]; then
     cleanup
-    _error "Exec failed: ´$result´"
+    exit 1
   fi
 }
 
-mbrBin=""
-function checkMbrBinLocations {
-  for mbrBinLocation in ${mbrBinLocations}; do
-    if [ -f "${mbrBinLocation}" ]; then
-      mbrBin="${mbrBinLocation}"
-      break
-    fi
-  done
-  if [ ! -f "$mbrBin" ]; then
-    _error "No mbr.bin found in one of the locations ´$mbrBinLocations´"
+check_device() {
+  _log "Check device ´$1´"
+  local device="$1"
+  local device_size
+  device_size=$((512 * $(cat "/sys/block/$(basename "$device")/size")))
+  if [ "${device_size}" -lt "${device_size_limit}" ]; then
+    _error "Device is too small. Current: ${device_size} Expected min: ${device_size_limit}"
+    handle_code 1
   fi
 }
 
-function checkTools {
-  for tool in ${requiredTools}; do
-    if ! which "${tool}" &>/dev/null; then
-      _error "Please install software package what provides: $tool"
-    fi
-  done
-}
-
-function checkDevice {
-  _log "Check device $device"
-  local deviceSize
-  deviceSize=$((512 * $(cat "/sys/block/${deviceName}/size")))
-  if [ "${deviceSize}" -lt "${deviceSizeLimit}" ]; then
-    _error "Device is too small. Current: ${deviceSize} Expected min: ${deviceSizeLimit}"
-  fi
-}
-
-function prepareISO {
-  _log "Check & mount $iso to $isoMnt"
-  _exec "mkdir -p ${isoMnt}"
-  _exec "mount -t iso9660 -o loop $iso $isoMnt"
-  if [[ ! -d "$isoMnt/system" ]] || [[ ! -d "$isoMnt/system" ]]; then
-    cleanup
+check_iso_content() {
+  _log "Check ISO content ´$1´"
+  local mnt="$1"
+  if [[ ! -d "$mnt/system" ]] || [[ ! -d "$mnt/usb" ]]; then
     _error "Missing system/ or usb/ directory at SPP directory structure. Maybe wrong iso file?"
+    handle_code 1
   fi
 }
 
-function prepareDevice {
-  _log "Prepare device... $device"
-  echo -n "All data on ´$device´ will be deleted, proceed? [y/N] "
-  read -rn 1 confirm
-  if [ "$confirm" != "y" ]; then
-    _log ""
-    cleanup
-    _error ""
-  fi
-  _log ""
+prepare_device() {
+  _log "Prepare device ´$1´"
+  local device="$1"
   _log "Create fat32 partition..."
-  _exec "echo -e 'o\nn\np\n1\n\n+7G\nw' | fdisk ${device}"
-  _exec "mkfs.vfat ${device}1"
-  _exec "mkdir -p ${deviceMnt}"
-  _exec "mount ${device}1 ${deviceMnt}"
+  execute "echo -e 'o\nn\np\n1\n\n+7G\na\n1\nw' | fdisk ${device}"
+  execute "mkfs.vfat ${device}1"
+  execute "dd conv=notrunc bs=440 count=1 if=\"$mbr_bin_path\" of=${device}"
+  # todo use fdisk to change partition boot flag
+  #execute "parted ${device} set 1 boot on"
+  execute "syslinux -i ${device}1"
 }
 
-function buildDevice {
-  _log "Copy data to device... takes some time."
-  _exec "cp -R ${isoMnt}/* ${deviceMnt}"
-  _log "Install syslinux on device..."
-  _exec "syslinux -i ${device}1"
-  _exec "dd conv=notrunc bs=440 count=1 if=$mbrBin of=${device}"
-  _exec "parted ${device} set 1 boot on"
-  _exec "cp ${isoMnt}/system/* ${isoMnt}/usb/syslinux.cfg ${deviceMnt}/"
+fill_device() {
+  _log "Copy data from ´$1´ to ´$2´... may take some time"
+  local srcMnt="$1"
+  local trgMnt="$2"
+  execute "cp -R ${srcMnt}/* ${trgMnt}"
+  execute "cp ${srcMnt}/system/* ${srcMnt}/usb/syslinux.cfg ${trgMnt}/"
   # Remove line DEFAULT vesamenu.c32
   # vesamenu often fails
-  _exec "sed -i \"s/^DEFAULT.*//\" ${deviceMnt}/syslinux.cfg"
+  execute "sed -i \"s/^DEFAULT.*//\" ${trgMnt}/syslinux.cfg"
 }
 
-checkTools
-checkMbrBinLocations
-checkDevice
-prepareISO
-prepareDevice
-buildDevice
+
+
+iso_mnt=$(_mount_iso "$iso")
+handle_code $?
+check_iso_content "$iso_mnt"
+check_device "$device"
+prepare_device "$device"
+device_mnt=$(_mount_device "${device}1")
+handle_code $?
+fill_device "$iso_mnt" "$device_mnt"
 cleanup
+
+echo "SPP Usb Stick Ready."
