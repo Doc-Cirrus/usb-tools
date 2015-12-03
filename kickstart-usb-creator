@@ -1,0 +1,170 @@
+#!/bin/bash
+#
+# Creates usb stick for kickstart installations
+
+script=$(readlink -f "$0")
+script_path=$(dirname "$script")
+script_name=$(basename "$script")
+
+# shellcheck source=/dev/null
+if ! source "$script_path/_functions"; then
+  echo "Function inclusion failed."
+  exit 1
+fi
+
+# 8GB usb min size limit
+# todo determine min usb size based on iso size
+device_size_limit=$((8 * 1024 * 1024 * 1024))
+
+function help {
+  echo
+  echo "Usage: $scriptName --iso <isoFile> --device </dev/sdX> --ks <ksFile>"
+  echo
+  echo "Creates bootable USB stick for kickstart installations."
+  echo "  --iso    Path to install .iso file"
+  echo "  --device Use the specified unmounted device as target"
+  echo "  --ks     Path to kickstart config"
+  echo
+  exit 1
+}
+
+
+# process options
+while [[ $# -ge 1 ]]; do
+  key="$1"
+  shift
+  case "$key" in
+    --device)
+      device="$1"
+      shift
+      ;;
+    --iso)
+      iso="$1"
+      shift
+      ;;
+    --ks)
+      ks="$1"
+      shift
+      ;;
+    --help)
+      help
+      ;;
+    *)
+      # unknown
+    ;;
+  esac
+done
+
+if [ -z "$iso" ]; then
+  _error "Missing path to .iso file."
+  help
+fi
+
+if [[ -z "$device" ]]; then
+  _error "Missing device."
+  help
+fi
+
+if [[ -z "$ks" ]]; then
+  _error "Missing path to kickstart file."
+  help
+fi
+
+# required cmd line tools
+_check_tools "readlink basename syslinux"
+if ! mbr_bin_path=$(_get_mbr_bin_path); then
+  exit 1
+fi
+
+echo -n "All data on ´$device´ will be deleted, proceed? [y/N] "
+read -rn 1 confirm
+echo ""
+if [ "$confirm" != "y" ]; then
+  echo ""
+  exit 1
+fi
+
+cleanup() {
+  _umount "$(_mnt_point "${device}1")"
+  _umount "$(_mnt_point "${device}2")"
+  _umount "$(_mnt_point "${iso}")"
+}
+
+execute() {
+  if ! _exec "$*"; then
+    handle_code 1
+  fi
+}
+
+handle_code() {
+  local code="$1"
+  if [ "$code" -ne 0 ]; then
+    cleanup
+    exit 1
+  fi
+}
+
+check_device() {
+  _log "Check device ´$1´"
+  local device="$1"
+  local deviceSize
+  deviceSize=$((512 * $(cat "/sys/block/$(basename "$device")/size")))
+  if [ "${deviceSize}" -lt "${device_size_limit}" ]; then
+    _error "Device is too small. Current: ${deviceSize} Expected min: ${device_size_limit}"
+    handle_code 1
+  fi
+}
+
+prepare_device() {
+  _log "Prepare device ´$1´"
+  local device="$1"
+  _log "Create partitions..."
+  execute "echo -e 'o\nn\np\n1\n\n+300M\na\n1\nn\np\n2\n\n+7G\nw' | fdisk ${device}"
+  execute "mkfs.vfat -n BOOT ${device}1"
+  execute "mkfs.ext4 -L DATA ${device}2"
+  execute "dd conv=notrunc bs=440 count=1 if=\"$mbr_bin_path\" of=${device}"
+  execute "syslinux -i ${device}1"
+}
+
+prepare_boot() {
+  _log "Fill boot partiton content..."
+  local device="$1"
+  local iso_mnt="$2"
+  device_mnt=$(_mount_device "${device}1")
+  handle_code $?
+  execute "cp $iso_mnt/isolinux/* $device_mnt/"
+  execute "mv \"$device_mnt/isolinux.cfg\" \"$device_mnt/syslinux.cfg\""
+  execute "sed -i '0,/.*append.*/s//\ \ append\ initrd=initrd.img\ method=hd:LABEL=DATA:\/\ ks=hd:LABEL=BOOT:\/ks.cfg/'  \"$device_mnt/syslinux.cfg\""
+  execute "sed -i 's/^TIMEOUT.*/timeout\ 100/i' \"$device_mnt/syslinux.cfg\""
+  execute "cp \"$ks\" \"$device_mnt/ks.cfg\""
+}
+
+prepare_data() {
+  _log "Fill data partiton content..."
+  local device="$1"
+  local iso_mnt="$2"
+  device_mnt=$(_mount_device "${device}2")
+  handle_code $?
+  #execute "cp \"$iso\" \"$device_mnt\""
+  execute "cp -r $iso_mnt/* \"$device_mnt\""
+}
+
+check_iso_content() {
+  _log "Check ISO content ´$1´"
+  local mnt="$1"
+  if [[ ! -d "$mnt/isolinux" ]]; then
+    _error "Missing isolinux/ at .iso directory structure. Maybe wrong .iso?"
+    handle_code 1
+  fi
+}
+
+check_device "$device"
+iso_mnt=$(_mount_iso "$iso")
+handle_code $?
+check_iso_content "$iso_mnt"
+prepare_device "$device"
+prepare_boot "$device" "$iso_mnt"
+prepare_data "$device" "$iso_mnt"
+cleanup
+
+echo "Kickstart Usb Stick Ready."

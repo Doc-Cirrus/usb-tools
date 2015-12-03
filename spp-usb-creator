@@ -132,7 +132,8 @@ fill_device() {
   execute "cp ${srcMnt}/system/* ${srcMnt}/usb/syslinux.cfg ${trgMnt}/"
   # Remove line DEFAULT vesamenu.c32
   # vesamenu often fails
-  execute "sed -i \"s/^DEFAULT.*//\" ${trgMnt}/syslinux.cfg"
+  execute "sed -i 's/^DEFAULT.*//' ${trgMnt}/syslinux.cfg"
+  execute "sed -i 's/^TIMEOUT.*/timeout\ 1/i' ${trgMnt}/syslinux.cfg"
 }
 
 
