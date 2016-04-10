@@ -14,7 +14,7 @@ fi
 
 # 8GB usb min size limit
 # todo determine min usb size based on iso size
-device_size_limit=$((8 * 1024 * 1024 * 1024))
+device_size_limit=$((8 * 1000 * 1000 * 1000))
 
 function help {
   echo
@@ -119,8 +119,6 @@ prepare_device() {
   execute "echo -e 'o\nn\np\n1\n\n+7G\na\n1\nw' | fdisk ${device}"
   execute "mkfs.vfat ${device}1"
   execute "dd conv=notrunc bs=440 count=1 if=\"$mbr_bin_path\" of=${device}"
-  # todo use fdisk to change partition boot flag
-  #execute "parted ${device} set 1 boot on"
   execute "syslinux -i ${device}1"
 }
 

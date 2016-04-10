@@ -14,7 +14,7 @@ fi
 
 # 8GB usb min size limit
 # todo determine min usb size based on iso size
-device_size_limit=$((8 * 1024 * 1024 * 1024))
+device_size_limit=$((8 * 1000 * 1000 * 1000))
 
 function help {
   echo
@@ -71,7 +71,7 @@ if [[ -z "$ks" ]]; then
 fi
 
 # required cmd line tools
-_check_tools "readlink basename syslinux"
+_check_tools "readlink basename syslinux mkfs.vfat partprobe"
 if ! mbr_bin_path=$(_get_mbr_bin_path); then
   exit 1
 fi
