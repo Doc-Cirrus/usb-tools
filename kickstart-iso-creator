@@ -1,0 +1,152 @@
+#!/bin/bash
+#
+# Creates usb stick for kickstart installations
+
+script=$(readlink -f "$0")
+script_path=$(dirname "$script")
+script_name=$(basename "$script")
+
+workdir=$(mktemp --directory)
+# included files folder name
+includedfolder=customfiles
+
+
+# shellcheck source=/dev/null
+if ! source "$script_path/_functions"; then
+  echo "Function inclusion failed."
+  exit 1
+fi
+
+function help {
+  echo
+  echo "Usage: $scriptName --iso <isoFile> --includepath <folderPath> --ks <ksFile> --out <isoFile>"
+  echo
+  echo "Creates bootable USB stick for kickstart installations."
+  echo "  --iso         Path to install .iso file"
+  echo "  --includepath Path with the files, that need to copied to the .iso file"
+  echo "  --ks          Path to kickstart config"
+  echo "  --out         Path to ouput .iso file"
+  echo
+  exit 1
+}
+
+
+# process options
+while [[ $# -ge 1 ]]; do
+  key="$1"
+  shift
+  case "$key" in
+    --includepath)
+      includepath="$1"
+      shift
+      ;;
+    --iso)
+      iso="$1"
+      shift
+      ;;
+    --ks)
+      ks="$1"
+      shift
+      ;;
+    --out)
+      out="$1"
+      shift
+      ;;
+    --help)
+      help
+      ;;
+    *)
+      # unknown
+    ;;
+  esac
+done
+
+if [ -z "$iso" ]; then
+  _error "Missing path to .iso file."
+  help
+fi
+
+if [ -z "$out" ]; then
+  echo "No output file path specified."
+  help
+fi
+
+if [[ -z "$includepath" ]]; then
+  echo "No includepath given -> no custom files copied to iso."
+fi
+
+if [[ -z "$ks" ]]; then
+  _error "Missing path to kickstart file."
+  help
+fi
+
+# required cmd line tools
+_check_tools "readlink basename syslinux mkisofs"
+if ! mbr_bin_path=$(_get_mbr_bin_path); then
+  exit 1
+fi
+
+
+execute() {
+  if ! _exec "$*"; then
+    handle_code 1
+  fi
+}
+
+handle_code() {
+  local code="$1"
+  if [ "$code" -ne 0 ]; then
+    cleanup
+    exit 1
+  fi
+}
+
+
+cleanup() {
+  _umount "$(_mnt_point "${iso}")"
+  execute rm -rf "$workdir" 
+  
+}
+
+fill_workdir() {
+  # copy files from iso
+  execute cp -pRf "$iso_mnt"/* "$workdir"
+  echo $(du -hs  "$workdir")
+  # repair permissions
+  execute chmod -R u+w "$workdir"
+  # copy kickstart file
+  execute cp "$ks" "$workdir"/isolinux/ks.cfg
+  # copy included stuff
+  if [[  -n "$includepath" ]]; then
+     execute mkdir "$workdir"/"$includedfolder"
+     execute cp -r "$includepath"/* "$workdir"/"$includedfolder"/
+  fi
+  # include kickstart file in boot config
+  execute cp isolinux.cfg "$workdir"/isolinux/isolinux.cfg
+
+}
+
+build_iso(){
+  execute mkisofs -o $out -V "CentOS" -b isolinux.bin -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -R -J -v -T "$workdir"/isolinux/ "$workdir"
+  execute chmod o+rw $out
+}
+
+check_iso_content() {
+  _log "Check ISO content ´$1´"
+  local mnt="$1"
+  if [[ ! -d "$mnt/isolinux" ]]; then
+    _error "Missing isolinux/ at .iso directory structure. Maybe wrong .iso?"
+    handle_code 1
+  fi
+}
+
+
+# mount and check iso
+iso_mnt=$(_mount_iso "$iso")
+handle_code $?
+check_iso_content "$iso_mnt"
+fill_workdir
+build_iso
+cleanup
+
+echo "Kickstart .iso file Ready."
