@@ -33,3 +33,13 @@ Further details on kickstart configuration file: https://access.redhat.com/docum
 - Linux to execute this script
 - USB stick with min 8GB size
 - CentOS/RHEL ISO image from here for example: https://wiki.centos.org/Download
+
+## kickstart-iso-creator
+
+The script takes an CentOS installation ISO and a kickstart file and creates a ISO file.
+Specific drivers can be included using the "--includepath" option. All files inside the given directory path will be stored into customfiles/ directory at the resulting ISO.
+
+## Requirements
+
+- Linux to execute this script
+- CentOS/RHEL ISO image from here for example: https://wiki.centos.org/Download
