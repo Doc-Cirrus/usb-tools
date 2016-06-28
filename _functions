@@ -74,7 +74,7 @@ _umount() {
 #   None
 #######################################
 _check_tools() {
-  for tool in "${@}"; do
+  for tool in "${array[@]}"; do
     if ! which "${tool}" &>/dev/null; then
       _error "Please install software package what provides: $tool"
       return 1
