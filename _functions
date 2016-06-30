@@ -74,7 +74,7 @@ _umount() {
 #   None
 #######################################
 _check_tools() {
-  for tool in "${@}"; do
+  for tool in "${array[@]}"; do
     if ! which "${tool}" &>/dev/null; then
       _error "Please install software package what provides: $tool"
       return 1
@@ -90,16 +90,16 @@ _check_tools() {
 #   Path to mbr.bin
 #######################################
 _get_mbr_bin_path() {
-  local possible_locations="/usr/share/syslinux/mbr.bin /usr/lib/syslinux/mbr.bin"
+  local possible_locations=('/usr/share/syslinux/mbr.bin' '/usr/lib/syslinux/mbr.bin' '/usr/lib/syslinux/mbr/mbr.bin')
   mbr_bin=""
-  for mbrBinLocation in ${possible_locations}; do
+  for mbrBinLocation in ${possible_locations[*]}; do
     if [ -f "${mbrBinLocation}" ]; then
       mbr_bin="${mbrBinLocation}"
       break
     fi
   done
   if [ -z "$mbr_bin" ]; then
-    _error "No mbr.bin found in one of the locations ´$possible_locations´"
+    _error "No mbr.bin found in one of the locations ´${possible_locations[*]}´"
     return 1
   else
     echo "$mbr_bin"
