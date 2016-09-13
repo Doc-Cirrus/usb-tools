@@ -127,7 +127,7 @@ prepare_device() {
 }
 
 prepare_boot() {
-  _log "Fill boot partiton content..."
+  _log "Fill boot partition content..."
   local device="$1"
   local iso_mnt="$2"
   device_mnt=$(_mount_device "${device}1")
@@ -137,6 +137,13 @@ prepare_boot() {
   execute "sed -i '0,/.*append.*/s//\ \ append\ initrd=initrd.img\ method=hd:LABEL=DATA:\/\ ks=hd:LABEL=BOOT:\/ks.cfg/'  \"$device_mnt/syslinux.cfg\""
   execute "sed -i 's/^TIMEOUT.*/timeout\ 100/i' \"$device_mnt/syslinux.cfg\""
   execute "cp \"$ks\" \"$device_mnt/ks.cfg\""
+  # overwrite .c32
+  local syslinuxDir=$(dirname "$mbr_bin_path")
+  execute "cp -f \"$syslinuxDir/../modules/bios/ldlinux.c32\" $device_mnt/"
+  execute "cp -f \"$syslinuxDir/../modules/bios/libcom32.c32\" $device_mnt/"
+  execute "cp -f \"$syslinuxDir/../modules/bios/libutil.c32\" $device_mnt/"
+  execute "cp -f \"$syslinuxDir/../modules/bios/menu.c32\" $device_mnt/"
+  execute "cp -f \"$syslinuxDir/../modules/bios/vesamenu.c32\" $device_mnt/"
 }
 
 prepare_data() {
