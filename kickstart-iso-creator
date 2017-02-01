@@ -104,31 +104,29 @@ handle_code() {
 
 cleanup() {
   _umount "$(_mnt_point "${iso}")"
-  execute rm -rf "$workdir" 
-  
+  #execute rm -rf "$workdir"
 }
 
 fill_workdir() {
   # copy files from iso
-  execute cp -pRf "$iso_mnt"/* "$workdir"
+  execute cp -r "$iso_mnt"/. "$workdir"
   echo $(du -hs  "$workdir")
   # repair permissions
   execute chmod -R u+w "$workdir"
   # copy kickstart file
   execute cp "$ks" "$workdir"/isolinux/ks.cfg
   # copy included stuff
-  if [[  -n "$includepath" ]]; then
+  if [ -n "$includepath" ]; then
      execute mkdir "$workdir"/"$includedfolder"
      execute cp -r "$includepath"/* "$workdir"/"$includedfolder"/
   fi
   # include kickstart file in boot config
   execute cp isolinux.cfg "$workdir"/isolinux/isolinux.cfg
-
 }
 
 build_iso(){
-  execute mkisofs -o $out -V "CentOS" -b isolinux.bin -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -R -J -v -T "$workdir"/isolinux/ "$workdir"
-  execute chmod o+rw $out
+  execute mkisofs -o "$out" -V "CentOS" -b isolinux/isolinux.bin -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -R -J -v -T "$workdir"
+  execute chmod o+rw "$out"
 }
 
 check_iso_content() {
