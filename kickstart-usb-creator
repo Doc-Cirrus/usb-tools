@@ -14,7 +14,7 @@ fi
 
 # 8GB usb min size limit
 # todo determine min usb size based on iso size
-device_size_limit=$((8 * 1000 * 1000 * 1000))
+device_size_limit=$((7 * 1000 * 1000 * 1000))
 
 function help {
   echo
@@ -134,7 +134,7 @@ prepare_boot() {
   handle_code $?
   execute "cp $iso_mnt/isolinux/* $device_mnt/"
   execute "mv \"$device_mnt/isolinux.cfg\" \"$device_mnt/syslinux.cfg\""
-  execute "sed -i '0,/.*append.*/s//\ \ append\ initrd=initrd.img\ method=hd:LABEL=DATA:\/\ ks=hd:LABEL=BOOT:\/ks.cfg/'  \"$device_mnt/syslinux.cfg\""
+  execute "sed -i '0,/.*append.*/s//\ \ append\ biosdevname=0\ initrd=initrd.img\ method=hd:LABEL=DATA:\/\ ks=hd:LABEL=BOOT:\/ks.cfg/' \"$device_mnt/syslinux.cfg\""
   execute "sed -i 's/^TIMEOUT.*/timeout\ 100/i' \"$device_mnt/syslinux.cfg\""
   execute "sed -i '/menu default/d' \"$device_mnt/syslinux.cfg\""
   execute "cp \"$ks\" \"$device_mnt/ks.cfg\""
@@ -153,10 +153,9 @@ prepare_data() {
   local iso_mnt="$2"
   device_mnt=$(_mount_device "${device}2")
   handle_code $?
-  #execute "cp \"$iso\" \"$device_mnt\""
   execute "cp -r $iso_mnt/* \"$device_mnt\""
   # todo
-  execute "cp $iso \"$device_mnt\""
+  #execute "cp $iso \"$device_mnt\""
 }
 
 check_iso_content() {

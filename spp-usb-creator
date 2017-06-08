@@ -18,11 +18,12 @@ device_size_limit=$((8 * 1000 * 1000 * 1000))
 
 function help {
   echo
-  echo "Usage: $script_name --iso <pathToIso> --device </dev/sdX>"
+  echo "Usage: $script_name --iso <pathToIso> --device </dev/sdX> [--poweroff]"
   echo
   echo "Creates bootable USB stick from HP SPP ISO."
   echo "  --iso    Uses provided ISO file"
   echo "  --device Use the specified unmounted device as target"
+  echo "  --poweroff Power off system after update"
   echo
   exit 1
 }
@@ -32,6 +33,9 @@ while [[ $# -ge 1 ]]; do
   key="$1"
   shift
   case "$key" in
+    --poweroff)
+      poweroff=1
+      ;;
     --device)
       device="$1"
       shift
@@ -132,8 +136,10 @@ fill_device() {
   # vesamenu often fails
   execute "sed -i 's/^DEFAULT.*//' ${trgMnt}/syslinux.cfg"
   execute "sed -i 's/^TIMEOUT.*/timeout\ 1/i' ${trgMnt}/syslinux.cfg"
+  if [ "$poweroff" -eq 1 ]; then
+    execute "sed -i 's/^ONTIMEOUT.*/ONTIMEOUT\ sos_poweroff/i' ${trgMnt}/syslinux.cfg"
+  fi
 }
-
 
 
 iso_mnt=$(_mount_iso "$iso")
