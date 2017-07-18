@@ -134,7 +134,7 @@ prepare_boot() {
   handle_code $?
   execute "cp $iso_mnt/isolinux/* $device_mnt/"
   execute "mv \"$device_mnt/isolinux.cfg\" \"$device_mnt/syslinux.cfg\""
-  execute "sed -i '0,/.*append.*/s//\ \ append\ biosdevname=0\ initrd=initrd.img\ method=hd:LABEL=DATA:\/\ ks=hd:LABEL=BOOT:\/ks.cfg/' \"$device_mnt/syslinux.cfg\""
+  execute "sed -i '0,/.*append.*/s//\ \ append\ biosdevname=0\ net.ifnames=0\ initrd=initrd.img\ method=hd:LABEL=DATA:\/\ ks=hd:LABEL=BOOT:\/ks.cfg/' \"$device_mnt/syslinux.cfg\""
   execute "sed -i 's/^TIMEOUT.*/timeout\ 100/i' \"$device_mnt/syslinux.cfg\""
   execute "sed -i '/menu default/d' \"$device_mnt/syslinux.cfg\""
   execute "cp \"$ks\" \"$device_mnt/ks.cfg\""
