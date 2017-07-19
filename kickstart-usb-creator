@@ -153,9 +153,9 @@ prepare_data() {
   local iso_mnt="$2"
   device_mnt=$(_mount_device "${device}2")
   handle_code $?
-  execute "cp -r $iso_mnt/* \"$device_mnt\""
-  # todo
-  #execute "cp $iso \"$device_mnt\""
+  execute "cp -r $iso_mnt/. \"$device_mnt\""
+  # sometimes using path to iso in kickstart install works better
+  execute "cp $iso \"$device_mnt/install.iso\""
 }
 
 check_iso_content() {
