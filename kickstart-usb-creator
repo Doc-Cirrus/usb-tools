@@ -136,6 +136,8 @@ prepare_boot() {
   execute "mv \"$device_mnt/isolinux.cfg\" \"$device_mnt/syslinux.cfg\""
   execute "sed -i '0,/.*append.*/s//\ \ append\ biosdevname=0\ net.ifnames=0\ initrd=initrd.img\ method=hd:LABEL=DATA:\/\ ks=hd:LABEL=BOOT:\/ks.cfg/' \"$device_mnt/syslinux.cfg\""
   execute "sed -i 's/^TIMEOUT.*/timeout\ 100/i' \"$device_mnt/syslinux.cfg\""
+  execute "sed -i 's/menu\ default//i' \"$device_mnt/syslinux.cfg\""
+  execute "sed -i '/label\ linux/a \ \ menu\ default' \"$device_mnt/syslinux.cfg\""
   execute "cp \"$ks\" \"$device_mnt/ks.cfg\""
   # overwrite .c32
   local syslinuxDir=$(dirname "$mbr_bin_path")
