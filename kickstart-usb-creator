@@ -29,6 +29,7 @@ function help {
 }
 
 
+
 # process options
 while [[ $# -ge 1 ]]; do
   key="$1"
@@ -132,6 +133,7 @@ prepare_boot() {
   local iso_mnt="$2"
   device_mnt=$(_mount_device "${device}1")
   handle_code $?
+  ## BIOS-Boot
   execute "cp $iso_mnt/isolinux/* $device_mnt/"
   execute "mv \"$device_mnt/isolinux.cfg\" \"$device_mnt/syslinux.cfg\""
   execute "sed -i '0,/.*append.*/s//\ \ append\ biosdevname=0\ net.ifnames=0\ initrd=initrd.img\ method=hd:LABEL=DATA:\/\ ks=hd:LABEL=BOOT:\/ks.cfg/' \"$device_mnt/syslinux.cfg\""
@@ -146,6 +148,12 @@ prepare_boot() {
   execute "cp -f \"$syslinuxDir/../modules/bios/libutil.c32\" $device_mnt/"
   execute "cp -f \"$syslinuxDir/../modules/bios/menu.c32\" $device_mnt/"
   execute "cp -f \"$syslinuxDir/../modules/bios/vesamenu.c32\" $device_mnt/"
+  ## UEFI-Boot
+  execute "cp -rf $iso_mnt/EFI $device_mnt/"
+  execute "cp -rf $iso_mnt/images $device_mnt/"
+  execute "sed -i 's/set default=\"1\"/set default=\"0\"/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
+  execute "sed -i 's/set timeout=60/set timeout=5/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
+  execute "sed -i 's/inst.stage2=hd:LABEL=CentOS\\\x207\\\x20x86_64 quiet/biosdevname=0 net.ifnames=0 initrd=initrd.img method=hd:LABEL=DATA:\/ ks=hd:LABEL=BOOT:\/ks.cfg/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
 }
 
 prepare_data() {
