@@ -7,6 +7,7 @@ script_path=$(dirname "$script")
 script_name=$(basename "$script")
 
 singleKickstart=true
+withToolsDir=false
 
 # shellcheck source=/dev/null
 if ! source "$script_path/_functions"; then
@@ -37,6 +38,8 @@ function kickstartError {
   echo "       and"
   echo "       [--efiks] and [--biosks] options allow to specify a different kickstart for EFI and BIOS systems"
   echo "       Using [--efiks] without [--biosks] or [--ks] with [--efiks]/[--biosks] options simultaneously is not allowed!"
+  echo "       "
+  echo "       If needed a directory with tools may be copied as well to the BOOT-Partition as well: [--toolsDir]"
   help
 }
 
@@ -89,6 +92,11 @@ while [[ $# -ge 1 ]]; do
       ;;
     --ks)
       ks="$1"
+      shift
+      ;;
+    --toolsDir)
+      toolsDir="$1"
+      withToolsDir=true
       shift
       ;;
     --help)
@@ -189,6 +197,9 @@ prepare_boot() {
   execute "sed -i 's/set default=\"1\"/set default=\"0\"/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
   execute "sed -i 's/set timeout=60/set timeout=5/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
   execute "sed -i 's/inst.stage2=hd:LABEL=CentOS\\\x207\\\x20x86_64 quiet/biosdevname=0 net.ifnames=0 initrd=initrd.img method=hd:LABEL=DATA:\/ ks=hd:LABEL=BOOT:\/efiks.cfg/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
+  if $withToolsDir; then
+    execute "cp -R \"$toolsDir\" \"$device_mnt/tools\""
+  fi
 }
 
 prepare_data() {
