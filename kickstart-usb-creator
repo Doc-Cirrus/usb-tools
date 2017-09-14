@@ -6,9 +6,6 @@ script=$(readlink -f "$0")
 script_path=$(dirname "$script")
 script_name=$(basename "$script")
 
-singleKickstart=true
-withToolsDir=false
-
 # shellcheck source=/dev/null
 if ! source "$script_path/_functions"; then
   echo "Function inclusion failed."
@@ -31,37 +28,18 @@ function help {
   exit 1
 }
 
-function kickstartError {
-  echo
-  echo "Error: single and multiple kickstart file options used."
-  echo "       [--ks] option allows to specify a single kickstart for EFI and BIOS systems"
-  echo "       and"
-  echo "       [--efiks] and [--biosks] options allow to specify a different kickstart for EFI and BIOS systems"
-  echo "       Using [--efiks] without [--biosks] or [--ks] with [--efiks]/[--biosks] options simultaneously is not allowed!"
-  echo "       "
-  echo "       If needed a directory with tools may be copied as well to the BOOT-Partition as well: [--toolsDir]"
-  help
-}
-
 function checkOptions {
-  # not enough kickstart file definitions
-  if [[ -z $ks ]] && ([[ -z $efiks ]] || [[ -z $biosks ]]); then
-    kickstartError
+  if [ -z "$ks" ]; then
+    _error "Missing path to kickstart file."
+    return 1
   fi
-  if ([[ -z $efiks ]] && [[ $biosks ]]) || ([[ $efiks ]] || [[ -z $biosks ]]); then
-    kickstartError
-  fi
-  # too many kickstart file definitions
-  if ([[ $ks ]] && [[ $efiks ]]) || ([[ $ks ]] && [[ $biosks ]]); then
-    kickstartError
-  fi
-    if [[ -z "$iso" ]]; then
+  if [ -z "$iso" ]; then
     _error "Missing path to .iso file."
-    help
+    return 1
   fi
-  if [[ -z "$device" ]]; then
+  if [ -z "$device" ]; then
     _error "Missing device."
-    help
+    return 1
   fi
 }
 
@@ -80,23 +58,8 @@ while [[ $# -ge 1 ]]; do
       iso="$1"
       shift
       ;;
-    --biosks)
-      biosks="$1"
-      singleKickstart=false
-      shift
-      ;;
-    --efiks)
-      efiks="$1"
-      singleKickstart=false
-      shift
-      ;;
     --ks)
       ks="$1"
-      shift
-      ;;
-    --toolsDir)
-      toolsDir="$1"
-      withToolsDir=true
       shift
       ;;
     --help)
@@ -112,6 +75,10 @@ done
 _check_tools "readlink basename syslinux mkfs.vfat partprobe"
 if ! mbr_bin_path=$(_get_mbr_bin_path); then
   exit 1
+fi
+
+if ! checkOptions; then
+  help
 fi
 
 echo -n "All data on ´$device´ will be deleted, proceed? [y/N] "
@@ -177,13 +144,8 @@ prepare_boot() {
   execute "sed -i 's/^TIMEOUT.*/timeout\ 100/i' \"$device_mnt/syslinux.cfg\""
   execute "sed -i 's/menu\ default//i' \"$device_mnt/syslinux.cfg\""
   execute "sed -i '/label\ linux/a \ \ menu\ default' \"$device_mnt/syslinux.cfg\""
-  if $singleKickstart; then
-    execute "cp \"$ks\" \"$device_mnt/biosks.cfg\""
-    execute "cp \"$ks\" \"$device_mnt/efiks.cfg\""
-  else
-    execute "cp \"$biosks\" \"$device_mnt/biosks.cfg\""
-    execute "cp \"$efiks\" \"$device_mnt/efiks.cfg\""
-  fi
+  execute "cp \"$ks\" \"$device_mnt/biosks.cfg\""
+  execute "cp \"$ks\" \"$device_mnt/efiks.cfg\""
   # overwrite .c32
   local syslinuxDir=$(dirname "$mbr_bin_path")
   execute "cp -f \"$syslinuxDir/../modules/bios/ldlinux.c32\" $device_mnt/"
@@ -197,9 +159,6 @@ prepare_boot() {
   execute "sed -i 's/set default=\"1\"/set default=\"0\"/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
   execute "sed -i 's/set timeout=60/set timeout=5/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
   execute "sed -i 's/inst.stage2=hd:LABEL=CentOS\\\x207\\\x20x86_64 quiet/biosdevname=0 net.ifnames=0 initrd=initrd.img method=hd:LABEL=DATA:\/ ks=hd:LABEL=BOOT:\/efiks.cfg/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
-  if $withToolsDir; then
-    execute "cp -R \"$toolsDir\" \"$device_mnt/tools\""
-  fi
 }
 
 prepare_data() {
