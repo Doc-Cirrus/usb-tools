@@ -64,7 +64,7 @@ if [[ -z "$device" ]]; then
 fi
 
 # required cmd line tools
-_check_tools "readlink basename syslinux"
+_check_tools syslinux
 if ! mbr_bin_path=$(_get_mbr_bin_path); then
   exit 1
 fi

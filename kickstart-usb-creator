@@ -14,7 +14,7 @@ fi
 
 # 8GB usb min size limit
 # todo determine min usb size based on iso size
-device_size_limit=$((7 * 1000 * 1000 * 1000))
+device_size_limit=$((3 * 1000 * 1000 * 1000))
 
 function help {
   echo
@@ -72,7 +72,7 @@ while [[ $# -ge 1 ]]; do
 done
 
 # required cmd line tools
-_check_tools "readlink basename syslinux mkfs.vfat partprobe"
+_check_tools syslinux mkfs.vfat partprobe
 if ! mbr_bin_path=$(_get_mbr_bin_path); then
   exit 1
 fi
@@ -124,7 +124,7 @@ prepare_device() {
   _log "Prepare device ´$1´"
   local device="$1"
   _log "Create partitions..."
-  execute "echo -e 'o\nn\np\n1\n\n+300M\na\n1\nn\np\n2\n\n+7G\nw' | fdisk ${device}"
+  execute "echo -e 'o\nn\np\n1\n\n+300M\na\nn\np\n2\n\n\nw' | fdisk ${device}"
   execute "mkfs.vfat -n BOOT ${device}1"
   execute "mkfs.ext4 -L DATA ${device}2"
   execute "dd conv=notrunc bs=440 count=1 if=\"$mbr_bin_path\" of=${device}"

@@ -74,8 +74,9 @@ _umount() {
 #   None
 #######################################
 _check_tools() {
-  for tool in "${array[@]}"; do
-    if ! which "${tool}" &>/dev/null; then
+  local tools=("$@")
+  for tool in "${tools[@]}"; do
+    if ! hash "$tool" &>/dev/null; then
       _error "Please install software package what provides: $tool"
       return 1
     fi

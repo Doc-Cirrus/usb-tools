@@ -81,7 +81,7 @@ if [[ -z "$ks" ]]; then
 fi
 
 # required cmd line tools
-_check_tools "readlink basename syslinux mkisofs"
+_check_tools syslinux mkisofs
 if ! mbr_bin_path=$(_get_mbr_bin_path); then
   exit 1
 fi
