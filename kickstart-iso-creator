@@ -19,7 +19,7 @@ fi
 
 function help {
   echo
-  echo "Usage: $scriptName --iso <isoFile> --includepath <folderPath> --ks <ksFile> --out <isoFile>"
+  echo "Usage: $script_name --iso <isoFile> --includepath <folderPath> --ks <ksFile> --out <isoFile>"
   echo
   echo "Creates bootable USB stick for kickstart installations."
   echo "  --iso         Path to install .iso file"
@@ -82,10 +82,6 @@ fi
 
 # required cmd line tools
 _check_tools syslinux mkisofs
-if ! mbr_bin_path=$(_get_mbr_bin_path); then
-  exit 1
-fi
-
 
 execute() {
   if ! _exec "$*"; then
@@ -110,7 +106,7 @@ cleanup() {
 fill_workdir() {
   # copy files from iso
   execute cp -r "$iso_mnt"/. "$workdir"
-  echo $(du -hs  "$workdir")
+  du -hs  "$workdir"
   # repair permissions
   execute chmod -R u+w "$workdir"
   # copy kickstart file
