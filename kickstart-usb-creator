@@ -159,6 +159,24 @@ prepare_boot() {
   execute "sed -i 's/set default=\"1\"/set default=\"0\"/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
   execute "sed -i 's/set timeout=60/set timeout=5/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
   execute "sed -i 's/inst.stage2=hd:LABEL=CentOS\\\x207\\\x20x86_64 quiet/biosdevname=0 net.ifnames=0 initrd=initrd.img method=hd:LABEL=DATA:\/ ks=hd:LABEL=BOOT:\/efiks.cfg/g' \"$device_mnt/EFI/BOOT/grub.cfg\""
+  cat <<EOF > $device_mnt/startup.nsh
+@echo -on
+cls
+
+for %m run (0 9)
+  if exist FS%m:\EFI\BOOT\BOOTX64.EFI then
+      FS%m:
+      \EFI\BOOT\BOOTX64.EFI
+  endif
+endfor
+
+for %m run (0 9)
+  if exist FS%m:\BOOT\BOOTX64.EFI then
+      FS%m:
+      \BOOT\BOOTX64.EFI
+  endif
+endfor
+EOF
 }
 
 prepare_data() {
