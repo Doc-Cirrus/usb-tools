@@ -117,12 +117,14 @@ fill_workdir() {
      execute cp -r "$includepath"/. "$workdir"/"$includedfolder"/
   fi
   # include kickstart file in boot config
-  execute cp isolinux.cfg "$workdir"/isolinux/isolinux.cfg
+  execute cp "$script_path/isolinux.cfg" "$workdir"/isolinux/isolinux.cfg
 }
 
 build_iso(){
   execute mkisofs -o "$out" -V "CentOS" -b isolinux/isolinux.bin -c boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -R -J -v -T "$workdir"
-  execute chmod o+rw "$out"
+  execute chmod 644 "$out"
+  local originalUser=$(who am i | awk '{print $1}')
+  execute chown "$originalUser" "$out"
 }
 
 check_iso_content() {

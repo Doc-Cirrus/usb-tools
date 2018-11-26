@@ -132,6 +132,8 @@ fill_device() {
   local trgMnt="$2"
   execute "cp -R ${srcMnt}/* ${trgMnt}"
   execute "cp ${srcMnt}/system/* ${srcMnt}/usb/syslinux.cfg ${trgMnt}/"
+  execute "cp $script_path/*.scexe ${trgMnt}/hp/swpackages/"
+  execute "cp $script_path/*.rpm ${trgMnt}/hp/swpackages/"
   # Remove line DEFAULT vesamenu.c32
   # vesamenu often fails
   execute "sed -i 's/^DEFAULT.*//' ${trgMnt}/syslinux.cfg"
